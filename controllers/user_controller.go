@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"go-todo-app/config"
+	"go-todo-app/helpers"
 	"go-todo-app/models"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
@@ -19,16 +19,16 @@ func Register(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		fmt.Printf("Error binding JSON: %v\n", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation Error", gin.H{
+			"details": err.Error(),
+		})
 		return
 	}
 
 	// Hash Password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		fmt.Printf("Error hashing password: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server Error", gin.H{"details": "Failed to hash password"})
 		return
 	}
 
@@ -39,13 +39,14 @@ func Register(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
-		fmt.Printf("Error creating user: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server Error", gin.H{"details": "Failed to create user"})
 		return
 	}
 
-	fmt.Printf("User registered successfully: %s\n", user.Username)
-	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully", "userId": user.ID})
+	helpers.APIResponse(c, http.StatusCreated, "User created successfully", gin.H{
+		"user_id":  user.ID,
+		"username": user.Username,
+	})
 }
 
 func Login(c *gin.Context) {
@@ -55,8 +56,9 @@ func Login(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		fmt.Printf("Error binding JSON: %v\n", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation Error", gin.H{
+			"details": err.Error(),
+		})
 		return
 	}
 
@@ -64,16 +66,18 @@ func Login(c *gin.Context) {
 
 	// Cari user berdasarkan username
 	if err := config.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
-		fmt.Printf("User not found: %v\n", err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
+			"details": "Invalid credentials",
+		})
 		return
 	}
 
 	// Verifikasi password
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
 	if err != nil {
-		fmt.Printf("Password mismatch: %v\n", err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
+			"details": "Invalid credentials",
+		})
 		return
 	}
 
@@ -85,12 +89,17 @@ func Login(c *gin.Context) {
 
 	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{
+			"details": "Failed to generate token",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	helpers.APIResponse(c, http.StatusOK, "Login successful", gin.H{
 		"token": tokenString,
-		"user":  user.Username,
+		"user": gin.H{
+			"id":       user.ID,
+			"username": user.Username,
+		},
 	})
 }
