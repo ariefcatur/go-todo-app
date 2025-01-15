@@ -45,8 +45,9 @@ go run main.go
 curl --location 'http://localhost:8080/register' \
 --header 'Content-Type: application/json' \
 --header 'X-API-Key: RAHASIA' \
---data '{
-    "username": "testuser",
+--data-raw '{
+    "username": "testuser1",
+    "email": "test1@example.com",
     "password": "pass123"
 }'
 ```
@@ -58,8 +59,10 @@ curl --location 'http://localhost:8080/register' \
 curl --location 'http://localhost:8080/login' \
 --header 'Content-Type: application/json' \
 --header 'X-API-Key: RAHASIA' \
---data '{
-    "username": "testuser",
+--data-raw '{
+    
+    "identity": "test@example.com",
+    
     "password": "pass123"
 }'
 ```
