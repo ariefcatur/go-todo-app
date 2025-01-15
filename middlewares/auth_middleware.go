@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"go-todo-app/helpers"
 	"net/http"
 	"os"
 	"strings"
@@ -13,7 +14,9 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			helpers.ErrorResponse(c, http.StatusUnauthorized, "Authorization header required", gin.H{
+				"details": "Invalid credentials",
+			})
 			c.Abort()
 			return
 		}
@@ -27,7 +30,9 @@ func AuthMiddleware() gin.HandlerFunc {
 		})
 
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
+				"details": "Invalid token",
+			})
 			c.Abort()
 			return
 		}
@@ -37,7 +42,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Set("user_id", userID)
 			c.Next()
 		} else {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
+				"details": "Invalid token claims",
+			})
 			c.Abort()
 			return
 		}

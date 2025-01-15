@@ -9,18 +9,43 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
 func Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required"`
+		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation Error", gin.H{
 			"details": err.Error(),
+		})
+		return
+	}
+
+	// Validate Email
+	if !helpers.IsValidEmail(input.Email) {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
+			"details": "Invalid email format",
+		})
+	}
+
+	// Check if email already exists
+	var existingUser models.User
+	if err := config.DB.Where("email = ?", input.Email).First(&existingUser).Error; err == nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
+			"details": "Email already registered",
+		})
+	}
+
+	// Check if username already exists
+	if err := config.DB.Where("username = ?", input.Username).First(&existingUser).Error; err == nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
+			"details": "Username already taken",
 		})
 		return
 	}
@@ -35,6 +60,7 @@ func Register(c *gin.Context) {
 	// Buat user baru
 	user := models.User{
 		Username: input.Username,
+		Email:    strings.ToLower(input.Email),
 		Password: string(hashedPassword),
 	}
 
@@ -46,12 +72,13 @@ func Register(c *gin.Context) {
 	helpers.APIResponse(c, http.StatusCreated, "User created successfully", gin.H{
 		"user_id":  user.ID,
 		"username": user.Username,
+		"email":    user.Email,
 	})
 }
 
 func Login(c *gin.Context) {
 	var input struct {
-		Username string `json:"username" binding:"required"`
+		Identity string `json:"identity" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 
@@ -64,8 +91,15 @@ func Login(c *gin.Context) {
 
 	var user models.User
 
-	// Cari user berdasarkan username
-	if err := config.DB.Where("username = ?", input.Username).First(&user).Error; err != nil {
+	// Check if identity is email or username
+	query := config.DB
+	if helpers.IsValidEmail(input.Identity) {
+		query = query.Where("email = ?", strings.ToLower(input.Identity))
+	} else {
+		query = query.Where("username = ?", input.Identity)
+	}
+
+	if err := query.First(&user).Error; err != nil {
 		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
 			"details": "Invalid credentials",
 		})
@@ -100,6 +134,7 @@ func Login(c *gin.Context) {
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
+			"email":    user.Email,
 		},
 	})
 }
