@@ -57,7 +57,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Buat user baru
+	// Create New User
 	user := models.User{
 		Username: input.Username,
 		Email:    strings.ToLower(input.Email),
@@ -106,7 +106,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Verifikasi password
+	// Verificate password
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
 	if err != nil {
 		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{

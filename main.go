@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"go-todo-app/config"
 	"go-todo-app/controllers"
 	"go-todo-app/middlewares"
@@ -11,14 +10,13 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
 	config.InitDatabase()
 
 	// Auto Migrate
-	config.DB.AutoMigrate(&models.User{}, &models.Task{})
+	err := config.DB.AutoMigrate(&models.User{}, &models.Task{})
+	if err != nil {
+		log.Fatal("Error migrating DB")
+	}
 
 	r := gin.Default()
 
