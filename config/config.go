@@ -10,7 +10,12 @@ func InitConfig() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		log.Fatalf("Failed read configuration!: %v", err)
+		viper.SetConfigFile("/.env")
+		err := viper.ReadInConfig()
+		if err != nil {
+			log.Fatalf("Failed read configuration!: %v", err)
+		}
+
 	}
 
 	log.Println("Configuration mounted successfully!")
