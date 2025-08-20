@@ -1,1 +1,8 @@
-config/.env
+# Go
+bin/
+dist/
+coverage.out
+
+# Env & secrets
+.env
+.env.*

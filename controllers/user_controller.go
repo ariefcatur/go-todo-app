@@ -8,16 +8,15 @@ import (
 	"go-todo-app/models"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
 
 func Register(c *gin.Context) {
 	var input struct {
-		Username string `json:"username" binding:"required"`
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
+		Username string `json:"username" binding:"required,min=3,max=30"`
+		Email    string `json:"email"    binding:"required"`
+		Password string `json:"password" binding:"required,min=8"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -27,11 +26,15 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	input.Username = strings.TrimSpace(input.Username)
+	input.Email = strings.TrimSpace(strings.ToLower(input.Email))
+
 	// Validate Email
 	if !helpers.IsValidEmail(input.Email) {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
 			"details": "Invalid email format",
 		})
+		return
 	}
 
 	// Check if email already exists
@@ -59,9 +62,9 @@ func Register(c *gin.Context) {
 
 	// Create New User
 	user := models.User{
-		Username: input.Username,
-		Email:    strings.ToLower(input.Email),
-		Password: string(hashedPassword),
+		Username:     input.Username,
+		Email:        strings.ToLower(input.Email),
+		PasswordHash: string(hashedPassword),
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
@@ -89,26 +92,26 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	identity := strings.TrimSpace(input.Identity)
 	var user models.User
 
 	// Check if identity is email or username
-	query := config.DB
-	if helpers.IsValidEmail(input.Identity) {
-		query = query.Where("email = ?", strings.ToLower(input.Identity))
+	q := config.DB
+	if helpers.IsValidEmail(identity) {
+		q = q.Where("email = ?", strings.ToLower(identity))
 	} else {
-		query = query.Where("username = ?", input.Identity)
+		q = q.Where("username = ?", identity)
 	}
 
-	if err := query.First(&user).Error; err != nil {
+	if err := q.First(&user).Error; err != nil {
 		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
 			"details": "Invalid credentials",
 		})
 		return
 	}
 
-	// Verificate password
-	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
-	if err != nil {
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
 		helpers.ErrorResponse(c, http.StatusUnauthorized, "Authentication failed", gin.H{
 			"details": "Invalid credentials",
 		})
@@ -116,12 +119,17 @@ func Login(c *gin.Context) {
 	}
 
 	// Generate token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	exp := time.Now().Add(config.C.JWTExpiry)
+	claims := jwt.MapClaims{
 		"user_id": user.ID,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
-	})
+		"exp":     exp.Unix(),
+		"iat":     time.Now().Unix(),
+		"nbf":     time.Now().Unix(),
+		// opsional: "iss": "go-todo-app", "aud": "go-todo-app-clients",
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	tokenString, err := token.SignedString([]byte(config.C.JWTSecret))
 	if err != nil {
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{
 			"details": "Failed to generate token",
@@ -130,7 +138,9 @@ func Login(c *gin.Context) {
 	}
 
 	helpers.APIResponse(c, http.StatusOK, "Login successful", gin.H{
-		"token": tokenString,
+		"token_type": "Bearer",
+		"expires_in": int(time.Until(exp).Seconds()),
+		"token":      tokenString,
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,

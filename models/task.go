@@ -1,13 +1,16 @@
 package models
 
-import "gorm.io/gorm"
+import (
+	"time"
+)
 
 type Task struct {
-	gorm.Model
-	Title       string `json:"title" gorm:"not null"`
-	Description string `json:"description"`
-	Status      string `json:"status" gorm:"default:'pending'"`  // pending, completed
-	Priority    string `json:"priority" gorm:"default:'medium'"` // low, medium, high
-	UserID      uint   `json:"user_id"`
-	User        User   `json:"-" gorm:"foreignkey:UserID"`
+	ID          int64      `gorm:"primaryKey" json:"id"`
+	UserID      int64      `gorm:"index;not null" json:"user_id"`
+	Title       string     `gorm:"size:255;not null" json:"title"`
+	Description string     `gorm:"type:text" json:"description"`
+	Priority    string     `gorm:"size:10;default:medium" json:"priority"` // low|medium|high (validasi di code)
+	Status      string     `gorm:"size:12;default:pending" json:"status"`  // pending|completed
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 }

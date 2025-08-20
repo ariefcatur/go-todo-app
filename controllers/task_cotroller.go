@@ -9,7 +9,6 @@ import (
 )
 
 func CreateTask(c *gin.Context) {
-	userID, _ := c.Get("user_id")
 	var task models.Task
 	if err := c.ShouldBindJSON(&task); err != nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
@@ -17,8 +16,8 @@ func CreateTask(c *gin.Context) {
 		})
 		return
 	}
-
-	task.UserID = userID.(uint)
+	uidAny, _ := c.Get("user_id")
+	task.UserID = uidAny.(int64)
 	if err := config.DB.Create(&task).Error; err != nil {
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{
 			"details": "Failed to create task",
