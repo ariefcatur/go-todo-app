@@ -13,6 +13,8 @@ import (
 
 func main() {
 	//config.InitDatabase()
+	gin.SetMode(config.C.GinMode)
+
 	config.Load()
 	config.ConnectDB()
 

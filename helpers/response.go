@@ -18,11 +18,11 @@ func APIResponse(c *gin.Context, statusCode int, message string, data interface{
 
 	c.JSON(statusCode, resp)
 }
-func ErrorResponse(c *gin.Context, statusCode int, message string, data interface{}) {
+func ErrorResponse(c *gin.Context, statusCode int, message string, errData interface{}) {
 	resp := Response{
 		Status:  statusCode,
 		Message: message,
-		Data:    data,
+		Error:   errData,
 	}
 
 	c.JSON(statusCode, resp)

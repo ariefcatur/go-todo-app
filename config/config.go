@@ -26,7 +26,7 @@ func Load() {
 		JWTSecret: mustEnv("JWT_SECRET"),
 		APIKey:    os.Getenv("API_KEY"),
 		GinMode:   getEnv("GIN_MODE", "release"),
-		JWTExpiry: getDuration("JWT_EXP_MIN", 30) * time.Minute,
+		JWTExpiry: getDuration("JWT_EXP_MIN", 30),
 	}
 }
 

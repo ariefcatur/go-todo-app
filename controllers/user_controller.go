@@ -2,14 +2,12 @@ package controllers
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 	"go-todo-app/config"
 	"go-todo-app/helpers"
 	"go-todo-app/models"
 	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strings"
-	"time"
 )
 
 func Register(c *gin.Context) {
@@ -118,29 +116,16 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Generate token
-	exp := time.Now().Add(config.C.JWTExpiry)
-	claims := jwt.MapClaims{
-		"user_id": user.ID,
-		"exp":     exp.Unix(),
-		"iat":     time.Now().Unix(),
-		"nbf":     time.Now().Unix(),
-		// opsional: "iss": "go-todo-app", "aud": "go-todo-app-clients",
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	tokenString, err := token.SignedString([]byte(config.C.JWTSecret))
+	token, err := helpers.CreateAccessToken(user.ID) // <- konsisten jwt/v5
 	if err != nil {
-		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{
-			"details": "Failed to generate token",
-		})
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{"details": "Failed to generate token"})
 		return
 	}
 
 	helpers.APIResponse(c, http.StatusOK, "Login successful", gin.H{
 		"token_type": "Bearer",
-		"expires_in": int(time.Until(exp).Seconds()),
-		"token":      tokenString,
+		"expires_in": int(config.C.JWTExpiry.Seconds()),
+		"token":      token,
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
