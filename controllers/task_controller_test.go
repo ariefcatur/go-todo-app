@@ -76,4 +76,11 @@ func TestTaskCRUD(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("list status=%d body=%s", w.Code, w.Body.String())
 	}
+
+	// verify pagination structure
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if _, ok := resp["data"].(map[string]interface{})["pagination"]; !ok {
+		t.Fatal("pagination field missing in response")
+	}
 }

@@ -35,7 +35,7 @@ func TestRegisterAndLogin(t *testing.T) {
 	regBody, _ := json.Marshal(map[string]string{
 		"username": "tester",
 		"email":    "tester@example.com",
-		"password": "pass12345",
+		"password": "Pass12345!",
 	})
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/register", bytes.NewReader(regBody))
@@ -48,7 +48,7 @@ func TestRegisterAndLogin(t *testing.T) {
 	// login
 	loginBody, _ := json.Marshal(map[string]string{
 		"identity": "tester@example.com",
-		"password": "pass12345",
+		"password": "Pass12345!",
 	})
 	w = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/login", bytes.NewReader(loginBody))
