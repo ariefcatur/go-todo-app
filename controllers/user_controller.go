@@ -35,12 +35,21 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Validate Password Strength
+	if valid, msg := helpers.IsStrongPassword(input.Password); !valid {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
+			"details": msg,
+		})
+		return
+	}
+
 	// Check if email already exists
 	var existingUser models.User
 	if err := config.DB.Where("email = ?", input.Email).First(&existingUser).Error; err == nil {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{
 			"details": "Email already registered",
 		})
+		return
 	}
 
 	// Check if username already exists

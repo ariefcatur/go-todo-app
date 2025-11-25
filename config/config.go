@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"time"
@@ -50,19 +49,3 @@ func getDuration(k string, def int) time.Duration {
 	return time.Duration(def) * time.Minute
 }
 func atoi(s string) int { var n int; fmt.Sscanf(s, "%d", &n); return n }
-
-func InitConfig() {
-	viper.SetConfigFile("config/.env")
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		viper.SetConfigFile(".env")
-		err := viper.ReadInConfig()
-		if err != nil {
-			log.Fatalf("Failed read configuration!: %v", err)
-		}
-
-	}
-
-	log.Println("Configuration mounted successfully!")
-}

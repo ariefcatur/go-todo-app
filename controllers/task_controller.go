@@ -11,6 +11,12 @@ import (
 	"go-todo-app/models"
 )
 
+const (
+	DefaultPage     = 1
+	DefaultPageSize = 20
+	MaxPageSize     = 100
+)
+
 func CreateTask(c *gin.Context) {
 	uid, _ := c.Get("user_id")
 	var in struct {
@@ -24,9 +30,9 @@ func CreateTask(c *gin.Context) {
 	}
 	p := strings.ToLower(strings.TrimSpace(in.Priority))
 	if p == "" {
-		p = "medium"
+		p = models.TaskPriorityMedium
 	}
-	if p != "low" && p != "medium" && p != "high" {
+	if !models.IsValidPriority(p) {
 		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "priority must be low|medium|high"})
 		return
 	}
@@ -45,12 +51,26 @@ func CreateTask(c *gin.Context) {
 
 func GetTasks(c *gin.Context) {
 	uid, _ := c.Get("user_id")
+
+	// Pagination
+	page, _ := strconv.Atoi(c.DefaultQuery("page", strconv.Itoa(DefaultPage)))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", strconv.Itoa(DefaultPageSize)))
+	if page < 1 {
+		page = DefaultPage
+	}
+	if pageSize < 1 || pageSize > MaxPageSize {
+		pageSize = DefaultPageSize
+	}
+	offset := (page - 1) * pageSize
+
 	var tasks []models.Task
+	var total int64
 	q := config.DB.Where("user_id = ?", uid.(int64))
 
+	// Filters
 	if s := c.Query("status"); s != "" {
 		s = strings.ToLower(s)
-		if s != "pending" && s != "completed" {
+		if !models.IsValidStatus(s) {
 			helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "status must be pending|completed"})
 			return
 		}
@@ -58,22 +78,43 @@ func GetTasks(c *gin.Context) {
 	}
 	if p := c.Query("priority"); p != "" {
 		p = strings.ToLower(p)
-		if p != "low" && p != "medium" && p != "high" {
+		if !models.IsValidPriority(p) {
 			helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "priority must be low|medium|high"})
 			return
 		}
 		q = q.Where("priority = ?", p)
 	}
-	if err := q.Order("id desc").Find(&tasks).Error; err != nil {
+
+	// Get total count
+	if err := q.Model(&models.Task{}).Count(&total).Error; err != nil {
+		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{"details": "fail count"})
+		return
+	}
+
+	// Get paginated tasks
+	if err := q.Order("id desc").Limit(pageSize).Offset(offset).Find(&tasks).Error; err != nil {
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{"details": "fail query"})
 		return
 	}
-	helpers.APIResponse(c, http.StatusOK, "OK", tasks)
+
+	helpers.APIResponse(c, http.StatusOK, "OK", gin.H{
+		"tasks": tasks,
+		"pagination": gin.H{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
+		},
+	})
 }
 
 func UpdateTask(c *gin.Context) {
 	uid, _ := c.Get("user_id")
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "invalid task id"})
+		return
+	}
 
 	var task models.Task
 	if err := config.DB.Where("id = ? AND user_id = ?", id, uid.(int64)).First(&task).Error; err != nil {
@@ -98,7 +139,7 @@ func UpdateTask(c *gin.Context) {
 	}
 	if in.Status != nil {
 		s := strings.ToLower(strings.TrimSpace(*in.Status))
-		if s != "pending" && s != "completed" {
+		if !models.IsValidStatus(s) {
 			helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "status must be pending|completed"})
 			return
 		}
@@ -106,7 +147,7 @@ func UpdateTask(c *gin.Context) {
 	}
 	if in.Priority != nil {
 		p := strings.ToLower(strings.TrimSpace(*in.Priority))
-		if p != "low" && p != "medium" && p != "high" {
+		if !models.IsValidPriority(p) {
 			helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "priority must be low|medium|high"})
 			return
 		}
@@ -121,10 +162,21 @@ func UpdateTask(c *gin.Context) {
 
 func DeleteTask(c *gin.Context) {
 	uid, _ := c.Get("user_id")
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err := config.DB.Where("id = ? AND user_id = ?", id, uid.(int64)).Delete(&models.Task{}).Error; err != nil {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		helpers.ErrorResponse(c, http.StatusBadRequest, "Validation error", gin.H{"details": "invalid task id"})
+		return
+	}
+
+	result := config.DB.Where("id = ? AND user_id = ?", id, uid.(int64)).Delete(&models.Task{})
+	if result.Error != nil {
 		helpers.ErrorResponse(c, http.StatusInternalServerError, "Server error", gin.H{"details": "fail delete"})
 		return
 	}
+	if result.RowsAffected == 0 {
+		helpers.ErrorResponse(c, http.StatusNotFound, "Not found", gin.H{"details": "task not found"})
+		return
+	}
+
 	helpers.APIResponse(c, http.StatusOK, "Deleted", gin.H{"id": id})
 }
